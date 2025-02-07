@@ -17,6 +17,7 @@
 
 package org.apache.dolphinscheduler.extract.base.client;
 
+import com.google.common.cache.*;
 import org.apache.dolphinscheduler.extract.base.utils.Host;
 
 import java.lang.reflect.Proxy;
@@ -26,11 +27,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
-import com.google.common.cache.RemovalListener;
 
 /**
  * This class is used to create a proxy client which will transform local method invocation to remove invocation.
@@ -45,9 +41,12 @@ class JdkDynamicRpcClientProxyFactory implements IRpcClientProxyFactory {
             // It's safe to remove dead host here because the client will be recreated when needed
             // and the client is only a proxy client, it will not hold any resource
             .expireAfterAccess(Duration.ofHours(1))
-            .removalListener((RemovalListener<String, Map<String, Object>>) notification -> {
-                log.warn("Remove DynamicRpcClientProxy cache for host: {}", notification.getKey());
-                notification.getValue().clear();
+            .removalListener(new RemovalListener<String, Map<String, Object>>() {
+                @Override
+                public void onRemoval(RemovalNotification<String, Map<String, Object>> notification) {
+                    log.warn("Remove DynamicRpcClientProxy cache for host: {}", notification.getKey());
+                    notification.getValue().clear();
+                }
             })
             .build(new CacheLoader<String, Map<String, Object>>() {
 
